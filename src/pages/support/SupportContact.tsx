@@ -113,7 +113,7 @@ const SupportContact: React.FC = () => {
                 <Label htmlFor="message">How can we help?</Label>
                 <Textarea
                   id="message"
-                  minRows={5}
+                  rows={5}
                   value={message}
                   onChange={(event) => setMessage(event.target.value)}
                   className="resize-none"

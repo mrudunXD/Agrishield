@@ -12,6 +12,13 @@ export default defineConfig(({ mode }) => ({
     watch: {
       usePolling: true,
     },
+    proxy: {
+      "/api": {
+        target: "http://localhost:4000",
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
   preview: {
     port: 5000,

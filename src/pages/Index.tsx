@@ -35,7 +35,7 @@ const Index: React.FC = () => {
       <section className="relative min-h-[600px] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img src={heroBackground} alt="Agricultural fields" className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/80 via-primary/60 to-accent/70"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
         </div>
         <div className="relative z-10 text-center max-w-4xl mx-auto px-4 py-16 animate-fade-in">
           <h1 className="text-5xl md:text-6xl font-bold text-white mb-6 drop-shadow-lg">
@@ -74,20 +74,23 @@ const Index: React.FC = () => {
         
         {/* CTA Section */}
         <section className="py-20 bg-primary text-white relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-primary to-accent opacity-90"></div>
-          <div className="container relative z-10 px-4 text-center">
-            <div className="max-w-3xl mx-auto animate-fade-in">
-              <h2 className="text-3xl md:text-5xl font-bold mb-6">
-                {t('landing.cta.title')}
-              </h2>
-              <p className="text-xl mb-8 text-white/90">
-                {t('landing.cta.description')}
-              </p>
-              <Link to="/login">
-                <Button size="lg" className="bg-white text-primary hover:bg-white/90 text-lg px-8 py-4 shadow-xl">
-                  {t('landing.cta.button')} <ArrowRight className="ml-2" />
-                </Button>
-              </Link>
+          <div className="container relative z-10 px-4">
+            <div className="max-w-3xl mx-auto text-center space-y-6 animate-fade-in">
+              <div className="space-y-4">
+                <h2 className="text-3xl md:text-5xl font-bold leading-tight">
+                  {t('landing.cta.title')}
+                </h2>
+                <p className="text-xl text-white/90 max-w-2xl mx-auto px-4">
+                  {t('landing.cta.description')}
+                </p>
+              </div>
+              <div className="flex justify-center pt-2">
+                <Link to="/login" className="inline-block">
+                  <Button size="lg" className="bg-white text-primary hover:bg-white/90 text-lg px-8 py-6 shadow-xl">
+                    {t('landing.cta.button')} <ArrowRight className="ml-2" />
+                  </Button>
+                </Link>
+              </div>
             </div>
           </div>
         </section>

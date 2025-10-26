@@ -30,8 +30,8 @@ export const queryClient = new QueryClient({
         return fetchWithErrorHandling(url);
       },
       refetchOnWindowFocus: false,
-      retry: false,
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      retry: 1,
+      staleTime: 1000 * 60 * 5,
     },
   },
 });

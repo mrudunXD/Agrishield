@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,101 +8,355 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
-import { MapPin, Phone, Mail, Edit, Save, Sprout, Droplets, Leaf } from 'lucide-react';
+import { apiRequest } from "@/lib/queryClient";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ProfileDocument, SupportRequest, defaultProfileDocument } from "@shared/profile";
+import { MapPin, Phone, Mail, Edit, Save, Sprout, Droplets, Leaf, FileText, Wallet, HelpCircle, Loader2, Clock3, X } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+
+const generateId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `id-${Math.random().toString(36).slice(2, 10)}`;
+
+const maskIdentifier = (value: string) =>
+  value.length > 4 ? `•••• ${value.slice(-4)}` : value;
+
+const createDocumentForm = () => ({
+  documentType: "Aadhar",
+  documentNumber: "",
+  notes: "",
+});
+
+const createSupportForm = () => ({
+  topic: "",
+  message: "",
+});
+
+const createFarmForm = () => ({
+  name: "",
+  area: "",
+  crop: "",
+  soilType: "",
+  irrigationType: "",
+});
 
 const Profile: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
-  const [profile, setProfile] = useState({
-    name: "Rajesh Kumar",
-    phone: "+91 98765 43210",
-    email: "rajesh.kumar@example.com",
-    fpoCode: "FPO-KA-2024-123",
-    village: "Kalaburagi",
-    district: "Kalaburagi",
-    state: "Karnataka",
-    pincode: "585101"
-  });
-
-  const [farms, setFarms] = useState([
-    {
-      name: "Farm Plot 1",
-      area: 5,
-      crop: "Mustard",
-      soilType: "Red soil",
-      irrigationType: "Drip"
-    },
-    {
-      name: "Farm Plot 2",
-      area: 3,
-      crop: "Sunflower",
-      soilType: "Black soil",
-      irrigationType: "Sprinkler"
-    }
-  ]);
+  const [profile, setProfile] = useState(() => ({ ...defaultProfileDocument.profile }));
+  const [focusAreas, setFocusAreas] = useState<string[]>(() => [...defaultProfileDocument.focusAreas]);
+  const [focusDraft, setFocusDraft] = useState("");
+  const [farms, setFarms] = useState(() => [...defaultProfileDocument.farms]);
+  const [documents, setDocuments] = useState(() => [...defaultProfileDocument.documents]);
+  const [bankAccount, setBankAccount] = useState(() => defaultProfileDocument.bankAccount ?? null);
+  const [supportRequests, setSupportRequests] = useState(() => [...defaultProfileDocument.supportRequests]);
+  const [lastUpdated, setLastUpdated] = useState(() => defaultProfileDocument.lastUpdated ?? new Date().toISOString());
 
   const [documentDialogOpen, setDocumentDialogOpen] = useState(false);
   const [bankDialogOpen, setBankDialogOpen] = useState(false);
   const [supportDialogOpen, setSupportDialogOpen] = useState(false);
   const [farmDialogOpen, setFarmDialogOpen] = useState(false);
 
-  const [documentForm, setDocumentForm] = useState({
-    documentType: "Aadhar",
-    documentNumber: "",
-    notes: ""
+  const [documentForm, setDocumentForm] = useState(() => createDocumentForm());
+
+  const [bankForm, setBankForm] = useState(() => ({
+    accountName: bankAccount?.accountName ?? defaultProfileDocument.profile.name,
+    accountNumber: bankAccount?.accountNumber ?? "",
+    ifsc: bankAccount?.ifsc ?? "",
+    branch: bankAccount?.branch ?? "",
+    upi: bankAccount?.upi ?? "",
+  }));
+
+  const [supportForm, setSupportForm] = useState(() => createSupportForm());
+
+  const [farmForm, setFarmForm] = useState(() => createFarmForm());
+
+  const queryClient = useQueryClient();
+
+  const {
+    data: profileData,
+    isLoading: profileLoading,
+    isFetching: profileFetching,
+  } = useQuery<ProfileDocument>({ queryKey: ["/api/profile"] });
+
+  useEffect(() => {
+    if (!profileData) return;
+
+    if (!isEditing) {
+      setProfile(profileData.profile);
+    }
+
+    setFocusAreas([...profileData.focusAreas]);
+    setFarms([...profileData.farms]);
+    setDocuments([...(profileData.documents ?? [])]);
+    setBankAccount(profileData.bankAccount ?? null);
+    setSupportRequests([...(profileData.supportRequests ?? [])]);
+    setLastUpdated(profileData.lastUpdated ?? new Date().toISOString());
+
+    if (!bankDialogOpen) {
+      setBankForm({
+        accountName: profileData.bankAccount?.accountName ?? profileData.profile.name,
+        accountNumber: profileData.bankAccount?.accountNumber ?? "",
+        ifsc: profileData.bankAccount?.ifsc ?? "",
+        branch: profileData.bankAccount?.branch ?? "",
+        upi: profileData.bankAccount?.upi ?? "",
+      });
+    }
+  }, [profileData, isEditing, bankDialogOpen]);
+
+  const assembleProfilePayload = useCallback(
+    (overrides?: Partial<ProfileDocument>): ProfileDocument => ({
+      profile,
+      focusAreas,
+      farms,
+      documents,
+      bankAccount,
+      supportRequests,
+      lastUpdated: new Date().toISOString(),
+      ...overrides,
+    }),
+    [profile, focusAreas, farms, documents, bankAccount, supportRequests]
+  );
+
+  const saveProfileMutation = useMutation<ProfileDocument, Error, ProfileDocument>({
+    mutationFn: (payload) =>
+      apiRequest("/api/profile", {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(["/api/profile"], data);
+
+      if (!isEditing) {
+        setProfile(data.profile);
+      }
+
+      setFocusAreas([...data.focusAreas]);
+      setFarms([...data.farms]);
+      setDocuments([...(data.documents ?? [])]);
+      setBankAccount(data.bankAccount ?? null);
+      setSupportRequests([...(data.supportRequests ?? [])]);
+      setLastUpdated(data.lastUpdated ?? new Date().toISOString());
+
+      if (!bankDialogOpen) {
+        setBankForm({
+          accountName: data.bankAccount?.accountName ?? data.profile.name,
+          accountNumber: data.bankAccount?.accountNumber ?? "",
+          ifsc: data.bankAccount?.ifsc ?? "",
+          branch: data.bankAccount?.branch ?? "",
+          upi: data.bankAccount?.upi ?? "",
+        });
+      }
+    },
   });
 
-  const [bankForm, setBankForm] = useState({
-    accountName: "Rajesh Kumar",
-    accountNumber: "",
-    ifsc: "",
-    branch: "",
-    upi: ""
-  });
+  const persistProfileDocument = useCallback(
+    async (overrides?: Partial<ProfileDocument>) => {
+      const payload = assembleProfilePayload(overrides);
+      return saveProfileMutation.mutateAsync(payload);
+    },
+    [assembleProfilePayload, saveProfileMutation]
+  );
 
-  const [supportForm, setSupportForm] = useState({
-    topic: "",
-    message: ""
-  });
+  const mutationErrorMessage = (error: unknown) =>
+    error instanceof Error ? error.message : 'Something went wrong while saving. Please try again.';
 
-  const [farmForm, setFarmForm] = useState({
-    name: "",
-    area: "",
-    crop: "",
-    soilType: "",
-    irrigationType: ""
-  });
-
-  const handleDocumentSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleAddFocusArea = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    toast({
-      title: 'Document details saved',
-      description: `${documentForm.documentType} reference stored securely for verification.`,
-    });
-    setDocumentDialogOpen(false);
-    setDocumentForm({ documentType: 'Aadhar', documentNumber: '', notes: '' });
+    const trimmed = focusDraft.trim();
+    if (!trimmed) {
+      toast({
+        title: 'Enter a focus area',
+        description: 'Add a short label to track your strategic priorities.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const exists = focusAreas.some((area) => area.toLowerCase() === trimmed.toLowerCase());
+    if (exists) {
+      toast({
+        title: 'Already added',
+        description: 'This focus area is already on your list.',
+      });
+      return;
+    }
+
+    const previousAreas = focusAreas;
+    const nextAreas = [...focusAreas, trimmed];
+    setFocusAreas(nextAreas);
+
+    try {
+      await persistProfileDocument({ focusAreas: nextAreas });
+      toast({
+        title: 'Focus area added',
+        description: 'We will prioritise recommendations around this theme.',
+      });
+      setFocusDraft("");
+    } catch (error) {
+      setFocusAreas(previousAreas);
+      toast({
+        title: 'Could not add focus area',
+        description: mutationErrorMessage(error),
+        variant: 'destructive',
+      });
+    }
   };
 
-  const handleBankSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    toast({
-      title: 'Bank account linked',
-      description: `${bankForm.accountName}'s account ending ${bankForm.accountNumber.slice(-4)} is ready for payouts.`,
-    });
-    setBankDialogOpen(false);
-    setBankForm({ accountName: 'Rajesh Kumar', accountNumber: '', ifsc: '', branch: '', upi: '' });
+  const handleRemoveFocusArea = async (label: string) => {
+    const previousAreas = focusAreas;
+    const nextAreas = focusAreas.filter((area) => area !== label);
+    setFocusAreas(nextAreas);
+
+    try {
+      await persistProfileDocument({ focusAreas: nextAreas });
+      toast({
+        title: 'Focus area removed',
+        description: `${label} will no longer influence recommendations.`,
+      });
+    } catch (error) {
+      setFocusAreas(previousAreas);
+      toast({
+        title: 'Could not remove focus area',
+        description: mutationErrorMessage(error),
+        variant: 'destructive',
+      });
+    }
   };
 
-  const handleSupportSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleDocumentSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    toast({
-      title: 'Support request submitted',
-      description: 'Our relationship manager will reach out within the next 2 working hours.',
-    });
-    setSupportDialogOpen(false);
-    setSupportForm({ topic: '', message: '' });
+
+    const trimmedNumber = documentForm.documentNumber.trim();
+    if (!trimmedNumber) {
+      toast({
+        title: 'Document number required',
+        description: 'Please provide the document reference before saving.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const previousDocuments = documents;
+    const newDocument = {
+      id: generateId(),
+      type: documentForm.documentType.trim() || 'Document',
+      number: trimmedNumber,
+      notes: documentForm.notes?.trim() || undefined,
+      uploadedAt: new Date().toISOString(),
+    } satisfies ProfileDocument['documents'][number];
+
+    const nextDocuments = [...documents, newDocument];
+    setDocuments(nextDocuments);
+
+    try {
+      await persistProfileDocument({ documents: nextDocuments });
+      toast({
+        title: 'Document saved',
+        description: `${newDocument.type} stored with reference ${maskIdentifier(newDocument.number)}.`,
+      });
+      setDocumentDialogOpen(false);
+      setDocumentForm(createDocumentForm());
+    } catch (error) {
+      setDocuments(previousDocuments);
+      toast({
+        title: 'Could not save document',
+        description: mutationErrorMessage(error),
+        variant: 'destructive',
+      });
+    }
   };
 
-  const handleFarmSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleBankSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const trimmedAccount = bankForm.accountNumber.trim();
+    const trimmedIfsc = bankForm.ifsc.trim();
+
+    if (!trimmedAccount || !trimmedIfsc) {
+      toast({
+        title: 'Bank details incomplete',
+        description: 'Please provide both account number and IFSC to link your bank.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const previousAccount = bankAccount;
+    const nextAccount = {
+      accountName: bankForm.accountName.trim() || profile.name,
+      accountNumber: trimmedAccount,
+      ifsc: trimmedIfsc.toUpperCase(),
+      branch: bankForm.branch.trim() || undefined,
+      upi: bankForm.upi.trim() || undefined,
+      linkedAt: new Date().toISOString(),
+    } satisfies NonNullable<ProfileDocument['bankAccount']>;
+
+    setBankAccount(nextAccount);
+
+    try {
+      await persistProfileDocument({ bankAccount: nextAccount });
+      toast({
+        title: 'Bank account linked',
+        description: `${nextAccount.accountName}'s account ${maskIdentifier(nextAccount.accountNumber)} is ready for payouts.`,
+      });
+      setBankDialogOpen(false);
+    } catch (error) {
+      setBankAccount(previousAccount);
+      toast({
+        title: 'Could not link bank account',
+        description: mutationErrorMessage(error),
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleSupportSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const trimmedTopic = supportForm.topic.trim();
+    const trimmedMessage = supportForm.message.trim();
+
+    if (!trimmedTopic || !trimmedMessage) {
+      toast({
+        title: 'Tell us more about your request',
+        description: 'Please provide both a topic and message so our team can help quickly.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const newRequest = {
+      id: generateId(),
+      topic: trimmedTopic,
+      message: trimmedMessage,
+      createdAt: new Date().toISOString(),
+      status: 'open' as const,
+    } satisfies ProfileDocument['supportRequests'][number];
+
+    const previousRequests = supportRequests;
+    const nextRequests = [newRequest, ...supportRequests];
+    setSupportRequests(nextRequests);
+
+    try {
+      await persistProfileDocument({ supportRequests: nextRequests });
+      toast({
+        title: 'Support request submitted',
+        description: 'Our relationship manager will reach out within the next 2 working hours.',
+      });
+      setSupportDialogOpen(false);
+      setSupportForm(createSupportForm());
+    } catch (error) {
+      setSupportRequests(previousRequests);
+      toast({
+        title: 'Could not submit request',
+        description: mutationErrorMessage(error),
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleFarmSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const areaValue = parseFloat(farmForm.area);
     if (Number.isNaN(areaValue) || areaValue <= 0) {
@@ -115,31 +369,53 @@ const Profile: React.FC = () => {
     }
 
     const newFarm = {
-      name: farmForm.name || `Farm Plot ${farms.length + 1}`,
+      name: farmForm.name.trim() || `Farm Plot ${farms.length + 1}`,
       area: Number(areaValue.toFixed(2)),
-      crop: farmForm.crop || 'Not set',
-      soilType: farmForm.soilType || 'Not set',
-      irrigationType: farmForm.irrigationType || 'Not set',
-    };
+      crop: farmForm.crop.trim() || 'Not set',
+      soilType: farmForm.soilType.trim() || 'Not set',
+      irrigationType: farmForm.irrigationType.trim() || 'Not set',
+    } satisfies ProfileDocument['farms'][number];
 
-    setFarms((prev) => [...prev, newFarm]);
-    toast({
-      title: 'Farm plot added',
-      description: `${newFarm.name} recorded with ${newFarm.area} acres.`,
-    });
-    setFarmDialogOpen(false);
-    setFarmForm({ name: '', area: '', crop: '', soilType: '', irrigationType: '' });
+    const previousFarms = farms;
+    const nextFarms = [...farms, newFarm];
+    setFarms(nextFarms);
+
+    try {
+      await persistProfileDocument({ farms: nextFarms });
+      toast({
+        title: 'Farm plot added',
+        description: `${newFarm.name} recorded with ${newFarm.area} acres.`,
+      });
+      setFarmDialogOpen(false);
+      setFarmForm(createFarmForm());
+    } catch (error) {
+      setFarms(previousFarms);
+      toast({
+        title: 'Could not save farm plot',
+        description: mutationErrorMessage(error),
+        variant: 'destructive',
+      });
+    }
   };
 
-  const focusAreas = [
-    "Sustainable irrigation",
-    "Soil stewardship",
-    "Market readiness"
-  ];
+  const isSaving = saveProfileMutation.isPending;
+  const showInitialLoading = profileLoading && !profileData;
 
-  const handleSave = () => {
-    setIsEditing(false);
-    // Save logic here
+  const handleSave = async () => {
+    try {
+      await persistProfileDocument();
+      toast({
+        title: 'Profile updated',
+        description: 'Your farmer identity details have been synced.',
+      });
+      setIsEditing(false);
+    } catch (error) {
+      toast({
+        title: 'Could not save changes',
+        description: mutationErrorMessage(error),
+        variant: 'destructive',
+      });
+    }
   };
 
   const totalArea = useMemo(() => farms.reduce((sum, farm) => sum + farm.area, 0), [farms]);
@@ -167,6 +443,15 @@ const Profile: React.FC = () => {
     { label: 'Link bank account', onClick: () => setBankDialogOpen(true) },
     { label: 'Request support', onClick: () => setSupportDialogOpen(true) },
   ];
+
+  if (showInitialLoading) {
+    return (
+      <div className="flex min-h-[70vh] flex-col items-center justify-center gap-4 text-muted-foreground">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-sm">Loading your profile. Hang tight while we fetch the latest details.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-10 animate-fade-in">
@@ -262,14 +547,44 @@ const Profile: React.FC = () => {
           <Card className="border-border/40 bg-card/95 shadow-sm">
             <CardHeader>
               <CardTitle className="text-base">Focus areas</CardTitle>
-              <CardDescription>Your current strategic priorities</CardDescription>
+              <CardDescription>Shape recommendations around what matters most.</CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-wrap gap-2">
-              {focusAreas.map((area) => (
-                <Badge key={area} variant="outline" className="rounded-full border-primary/30 bg-primary/10 text-primary">
-                  {area}
-                </Badge>
-              ))}
+            <CardContent className="space-y-4">
+              <form className="flex flex-col gap-2 sm:flex-row" onSubmit={handleAddFocusArea}>
+                <Input
+                  value={focusDraft}
+                  onChange={(event) => setFocusDraft(event.target.value)}
+                  placeholder='Add a new priority (e.g. "Export markets")'
+                  className="sm:flex-1"
+                  disabled={saveProfileMutation.isPending}
+                />
+                <Button type="submit" disabled={saveProfileMutation.isPending}>
+                  Add focus
+                </Button>
+              </form>
+              <div className="flex flex-wrap gap-2">
+                {focusAreas.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No focus areas yet. Add one to personalise insights.</p>
+                ) : (
+                  focusAreas.map((area) => (
+                    <Badge
+                      key={area}
+                      variant="outline"
+                      className="group flex items-center gap-1 rounded-full border-primary/30 bg-primary/10 pr-2 text-primary"
+                    >
+                      {area}
+                      <button
+                        type="button"
+                        className="rounded-full p-1 transition hover:bg-primary/10"
+                        onClick={() => handleRemoveFocusArea(area)}
+                        aria-label={`Remove ${area}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))
+                )}
+              </div>
             </CardContent>
           </Card>
 

@@ -1,4 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   LayoutDashboard,
   Sprout,
@@ -23,30 +24,31 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-const navItems = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Yield Intelligence", url: "/yield-intelligence", icon: Sprout },
-  { title: "Market Forecast", url: "/market-forecast", icon: TrendingUp },
-  { title: "Weather Forecast", url: "/weather-forecast", icon: Cloud },
-  { title: "Smart Hedging", url: "/hedging", icon: Shield },
-  { title: "My Contracts", url: "/contracts", icon: FileText },
-  { title: "Learning Center", url: "/learning", icon: GraduationCap },
-  { title: "Profile", url: "/profile", icon: User },
-];
-
 export function AppSidebar() {
+  const { t } = useTranslation();
   const { state } = useSidebar();
   const location = useLocation();
   const collapsed = state === "collapsed";
 
   const isActive = (path: string) => location.pathname === path;
 
+  const navItems = [
+    { title: t("nav.dashboard"), url: "/dashboard", icon: LayoutDashboard },
+    { title: t("nav.yieldIntelligence"), url: "/yield-intelligence", icon: Sprout },
+    { title: t("nav.marketForecast"), url: "/market-forecast", icon: TrendingUp },
+    { title: t("nav.weatherForecast"), url: "/weather-forecast", icon: Cloud },
+    { title: t("nav.hedging"), url: "/hedging", icon: Shield },
+    { title: t("nav.contracts"), url: "/contracts", icon: FileText },
+    { title: t("nav.learningCenter"), url: "/learning", icon: GraduationCap },
+    { title: t("nav.profile"), url: "/profile", icon: User },
+  ];
+
   return (
     <Sidebar collapsible="icon" className="border-r">
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel className={collapsed ? "justify-center" : ""}>
-            {!collapsed && "Navigation"}
+            {!collapsed && t("nav.dashboard")}
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -71,7 +73,7 @@ export function AppSidebar() {
                 <SidebarMenuButton asChild>
                   <NavLink to="/">
                     <Home className="w-4 h-4" />
-                    {!collapsed && <span>Back to Home</span>}
+                    {!collapsed && <span>{t("nav.home")}</span>}
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -79,7 +81,7 @@ export function AppSidebar() {
                 <SidebarMenuButton asChild>
                   <NavLink to="/onboarding">
                     <LogOut className="w-4 h-4" />
-                    {!collapsed && <span>Logout</span>}
+                    {!collapsed && <span>{t("auth.logout")}</span>}
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

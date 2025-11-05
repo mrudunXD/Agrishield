@@ -2,10 +2,8 @@ import React, { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Mic, Send, User, Bot, Loader2, Volume2, VolumeX } from "lucide-react";
+import { Mic, Send, User, Bot, Loader2, Sparkles, Volume2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import ConsentModal from "@/components/sakhi/ConsentModal";
 import QuickActions from "@/components/sakhi/QuickActions";
@@ -18,52 +16,6 @@ import {
 interface SakhiExperienceProps {
   embedded?: boolean;
 }
-
-type VoiceProfile = {
-  id: string;
-  label: string;
-  gender: "female" | "male" | "neutral";
-  language: string;
-  matchers: RegExp[];
-};
-
-const voiceProfiles: VoiceProfile[] = [
-  {
-    id: "en-female-soft",
-    label: "Asha · Warm Female",
-    gender: "female",
-    language: "en-IN",
-    matchers: [/asha/i, /female/i, /india/i, /en-IN/i],
-  },
-  {
-    id: "en-female-clear",
-    label: "Meera · Crisp Female",
-    gender: "female",
-    language: "en-IN",
-    matchers: [/meera/i, /female/i, /en-IN/i],
-  },
-  {
-    id: "en-male-calm",
-    label: "Arjun · Calm Male",
-    gender: "male",
-    language: "en-IN",
-    matchers: [/arjun/i, /male/i, /en-IN/i],
-  },
-  {
-    id: "en-male-energetic",
-    label: "Rohit · Energetic Male",
-    gender: "male",
-    language: "en-IN",
-    matchers: [/rohit/i, /male/i, /en-IN/i],
-  },
-  {
-    id: "en-neutral-global",
-    label: "Kai · Neutral Global",
-    gender: "neutral",
-    language: "en-GB",
-    matchers: [/english/i, /neutral/i, /en-GB/i],
-  },
-];
 
 // Add minimal Web Speech API declarations for browser compatibility
 declare global {
@@ -91,6 +43,7 @@ const SakhiExperience: React.FC<SakhiExperienceProps> = ({ embedded = false }) =
   const messagesRef = useRef<Message[]>(messages);
   const lastSubmittedTranscriptRef = useRef<string>("");
   const shouldResumeRecognitionRef = useRef(false);
+  const finalTranscriptRef = useRef("");
 
   // Class name variables (after state so we can reference isListening)
   const userAvatarClass = embedded
@@ -121,13 +74,38 @@ const SakhiExperience: React.FC<SakhiExperienceProps> = ({ embedded = false }) =
     ? "h-11 w-11 rounded-xl bg-primary text-primary-foreground shadow-lg transition hover:bg-primary/90"
     : "h-11 w-11 rounded-xl bg-gradient-to-br from-emerald-500 via-emerald-400 to-teal-300 text-emerald-950 shadow-lg transition hover:scale-105";
 
-  const micButtonClass = embedded
-    ? `h-11 w-11 rounded-xl border border-border/40 bg-muted/40 text-muted-foreground transition ${
-        isListening ? "animate-pulse border-primary text-primary" : "hover:bg-muted/50"
-      }`
-    : `h-11 w-11 rounded-xl border border-white/30 bg-white/10 text-white transition ${
-        isListening ? "animate-pulse border-emerald-400 text-emerald-100" : "hover:bg-white/20"
-      }`;
+  const micButtonBaseClass = embedded
+    ? "h-11 w-11 rounded-xl border border-border/40 bg-muted/40 text-muted-foreground transition"
+    : "h-11 w-11 rounded-xl border border-white/30 bg-white/10 text-white transition";
+
+  const micButtonActiveClass = embedded
+    ? "animate-pulse border-primary text-primary"
+    : "animate-pulse border-emerald-400 text-emerald-100";
+
+  const micButtonIdleClass = embedded ? "hover:bg-muted/50" : "hover:bg-white/20";
+
+  const micButtonClass = `${micButtonBaseClass} ${isListening ? micButtonActiveClass : micButtonIdleClass}`;
+
+  const messageVariants = useMemo(
+    () => ({
+      hidden: { opacity: 0, y: 12, scale: 0.98 },
+      visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.28, ease: [0.16, 1, 0.3, 1] } },
+      exit: { opacity: 0, y: -8, scale: 0.96, transition: { duration: 0.2, ease: 'easeInOut' } },
+    }),
+    []
+  );
+
+  const composerVariants = useMemo(
+    () => ({
+      hidden: { opacity: 0, y: 16 },
+      visible: { opacity: 1, y: 0, transition: { delay: 0.1, duration: 0.35, ease: [0.16, 1, 0.3, 1] } },
+    }),
+    []
+  );
+
+  const overlayGradients = embedded
+    ? "bg-gradient-to-br from-primary/10 via-background to-background"
+    : "bg-gradient-to-br from-emerald-500/15 via-emerald-400/10 to-slate-950";
 
   // Handle consent response
   const handleConsent = useCallback((consent: boolean) => {
@@ -144,10 +122,7 @@ const SakhiExperience: React.FC<SakhiExperienceProps> = ({ embedded = false }) =
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
-  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [voiceEnabled, setVoiceEnabled] = useState(true);
-  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(voiceProfiles[0]?.id ?? "");
-  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -165,69 +140,12 @@ const SakhiExperience: React.FC<SakhiExperienceProps> = ({ embedded = false }) =
     }
     synthRef.current = window.speechSynthesis;
 
-    const populateVoices = () => {
-      const voices = window.speechSynthesis.getVoices();
-      setAvailableVoices(voices);
-    };
-
-    populateVoices();
-    window.speechSynthesis.onvoiceschanged = populateVoices;
-
     return () => {
       if (window.speechSynthesis) {
-        window.speechSynthesis.onvoiceschanged = null;
+        window.speechSynthesis.cancel();
       }
     };
   }, []);
-
-  const matchedVoices = useMemo(() => {
-    if (!availableVoices.length) return [];
-    const usedVoiceNames = new Set<string>();
-
-    return voiceProfiles.map((profile) => {
-      const primaryMatch = availableVoices.find((voice) =>
-        profile.matchers.some((matcher) => matcher.test(`${voice.name} ${voice.lang}`))
-      );
-
-      const hindiMatch = availableVoices.find((voice) => voice.lang.toLowerCase().startsWith("hi"));
-
-      const regionalMatch = availableVoices.find((voice) => voice.lang.toLowerCase().includes("en-in"));
-
-      const englishMatch = availableVoices.find((voice) => voice.lang.toLowerCase().startsWith("en"));
-
-      const candidateSearchOrder = [primaryMatch, hindiMatch, regionalMatch, englishMatch];
-
-      let chosenVoice: SpeechSynthesisVoice | null = null;
-      const fallbackVoice = availableVoices.find((voice) => !usedVoiceNames.has(voice.name));
-
-      for (const candidate of candidateSearchOrder) {
-        if (candidate && !usedVoiceNames.has(candidate.name)) {
-          chosenVoice = candidate;
-          break;
-        }
-      }
-
-      if (!chosenVoice) {
-        chosenVoice = fallbackVoice ?? null;
-      }
-
-      if (chosenVoice) {
-        usedVoiceNames.add(chosenVoice.name);
-      }
-
-      return {
-        profile,
-        voice: chosenVoice,
-      };
-    });
-  }, [availableVoices]);
-
-  const selectedVoiceEntry = useMemo(() => {
-    return matchedVoices.find((entry) => entry.profile.id === selectedVoiceId) ?? null;
-  }, [matchedVoices, selectedVoiceId]);
-
-  const selectedVoice = selectedVoiceEntry?.voice ?? null;
-  const selectedVoiceProfile = selectedVoiceEntry?.profile ?? null;
 
   const speakText = useCallback(
     (text: string) => {
@@ -238,16 +156,13 @@ const SakhiExperience: React.FC<SakhiExperienceProps> = ({ embedded = false }) =
       }
 
       const utterance = new SpeechSynthesisUtterance(text);
-      if (selectedVoice) {
-        utterance.voice = selectedVoice;
-      }
       utterance.rate = 1;
-      const voiceGender = selectedVoiceProfile?.gender ?? "female";
-      utterance.pitch = voiceGender === "male" ? 0.95 : voiceGender === "neutral" ? 1 : 1.05;
-      utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend = () => setIsSpeaking(false);
+      utterance.pitch = 1;
+      utterance.onend = () => {
+        setVoiceEnabled(false);
+      };
       utterance.onerror = () => {
-        setIsSpeaking(false);
+        setVoiceEnabled(false);
         toast({
           title: "Voice playback failed",
           description: "Unable to play the voice selection. Try another voice or refresh.",
@@ -256,14 +171,24 @@ const SakhiExperience: React.FC<SakhiExperienceProps> = ({ embedded = false }) =
       };
       synthRef.current.speak(utterance);
     },
-    [selectedVoice, toast, voiceEnabled]
+    [toast, voiceEnabled]
   );
 
-  const stopSpeaking = useCallback(() => {
-    if (!synthRef.current || !synthRef.current.speaking) return;
-    synthRef.current.cancel();
-    setIsSpeaking(false);
-  }, []);
+  const armVoicePlayback = useCallback(() => {
+    if (!synthRef.current) {
+      toast({
+        title: "Voice playback unavailable",
+        description: "Your browser does not support speech synthesis.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setVoiceEnabled(true);
+    toast({
+      title: "Voice reply armed",
+      description: "Sakhi will speak the next response only.",
+    });
+  }, [toast]);
 
   const handleSendMessage = useCallback(async (text: string) => {
     if (!text.trim()) return;
@@ -336,26 +261,40 @@ const SakhiExperience: React.FC<SakhiExperienceProps> = ({ embedded = false }) =
 
     recognition.onstart = () => {
       setIsListening(true);
+      finalTranscriptRef.current = "";
+      lastSubmittedTranscriptRef.current = "";
     };
 
     recognition.onresult = (event: any) => {
-      const transcript = Array.from(event.results)
-        .map((result: any) => result[0]?.transcript ?? "")
-        .join("")
-        .trim();
+      let interimTranscript = "";
+      let finalDetected = false;
 
-      if (!transcript) {
-        return;
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        const result = event.results[i];
+        const transcript = result[0]?.transcript ?? "";
+
+        if (!transcript.trim()) continue;
+
+        if (result.isFinal) {
+          finalTranscriptRef.current = `${finalTranscriptRef.current}${transcript} `;
+          finalDetected = true;
+        } else {
+          interimTranscript += transcript;
+        }
       }
 
-      setInputText(transcript);
+      const combinedTranscript = `${finalTranscriptRef.current}${interimTranscript}`.trim();
+      if (combinedTranscript) {
+        setInputText(combinedTranscript);
+      }
 
-      const lastResult = event.results[event.results.length - 1];
-      if (lastResult?.isFinal) {
-        if (transcript && transcript !== lastSubmittedTranscriptRef.current) {
-          lastSubmittedTranscriptRef.current = transcript;
-          void handleSendMessage(transcript);
+      if (finalDetected) {
+        const finalText = finalTranscriptRef.current.trim();
+        if (finalText && finalText !== lastSubmittedTranscriptRef.current) {
+          lastSubmittedTranscriptRef.current = finalText;
+          void handleSendMessage(finalText);
         }
+        finalTranscriptRef.current = "";
         shouldResumeRecognitionRef.current = false;
         recognition.stop();
       }
@@ -465,7 +404,6 @@ const SakhiExperience: React.FC<SakhiExperienceProps> = ({ embedded = false }) =
     }
 
     try {
-      lastSubmittedTranscriptRef.current = "";
       shouldResumeRecognitionRef.current = true;
       setInputText('');
       recognition.start();
@@ -486,127 +424,222 @@ const SakhiExperience: React.FC<SakhiExperienceProps> = ({ embedded = false }) =
     }
   }, [initializeRecognition, isListening, isSpeechSupported, toast]);
 
-  return (
-    <div className="flex h-full flex-col">
-      <div className="flex-1 space-y-5 overflow-y-auto px-5 py-6">
-        {messages.map((message) => {
-          const isUser = message.sender === "user";
-          const avatarClass = isUser ? userAvatarClass : sakhiAvatarClass;
-          const bubbleClass = isUser ? userBubbleClass : sakhiBubbleClass;
+  const containerClass = embedded
+    ? "relative flex h-full flex-col overflow-hidden rounded-2xl border border-border/40 bg-background/80 backdrop-blur"
+    : "relative flex h-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-slate-950/60 shadow-[0_25px_80px_-40px_rgba(16,185,129,0.65)] backdrop-blur-xl";
 
-          return (
-            <div
-              key={message.id}
-              className={`flex gap-3 animate-fade-in ${isUser ? "flex-row-reverse" : ""}`}
-            >
-              <div
-                className={`mt-0.5 flex h-9 w-9 items-center justify-center rounded-full shadow-lg ${avatarClass}`}
-              >
-                {isUser ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
-              </div>
-              <div className={`flex max-w-[80%] flex-col ${isUser ? "items-end" : ""}`}>
-                <Card className={`border-0 shadow-lg backdrop-blur-xl ${bubbleClass}`}>
-                  <CardContent className="p-4">
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
-                  </CardContent>
-                </Card>
-                {message.quickActions && message.quickActions.length > 0 && (
-                  <div className="mt-2">
-                    <QuickActions actions={message.quickActions} onAction={handleQuickAction} />
-                  </div>
-                )}
-                <p className={timestampClass}>
-                  {message.timestamp.toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
+  return (
+    <motion.div
+      className={containerClass}
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+    >
+      <div className={`pointer-events-none absolute inset-0 ${overlayGradients}`} />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.18),_transparent_65%)]" />
+
+      <div className="relative z-10 flex flex-col h-full">
+        <header className="px-5 pt-6 pb-4 md:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-5">
+            <div className="space-y-1">
+              <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-emerald-200/80">
+                <Sparkles className="h-3.5 w-3.5" /> Sakhi Voice Desk
+              </span>
+              <div className="space-y-1">
+                <h2 className="text-xl font-semibold text-white md:text-2xl">Speak naturally, get tailored advice</h2>
+                <p className="text-sm text-emerald-100/80">
+                  Tap the mic when you need voice input. Sakhi listens only when you ask.
                 </p>
               </div>
             </div>
-          );
-        })}
-
-        {isProcessing && (
-          <div className="flex gap-3">
-            <div
-              className={`mt-0.5 flex h-9 w-9 items-center justify-center rounded-full shadow-lg ${sakhiAvatarClass}`}
-            >
-              <Bot className="w-4 h-4" />
-            </div>
-            <Card className={`border-0 shadow-lg backdrop-blur-xl ${sakhiBubbleClass}`}>
-              <CardContent className="flex items-center gap-2 p-4">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <p className="text-sm">Sakhi is thinking...</p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        <div ref={messagesEndRef} />
-      </div>
-
-      <div
-        className={
-          embedded
-            ? "border-t border-border/40 bg-muted/30 px-5 py-4"
-            : "border-t border-white/10 bg-white/5 px-5 py-4 backdrop-blur-xl"
-        }
-      >
-        <div className="flex gap-3">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={handleMicClick}
-            disabled={isProcessing || !isSpeechSupported}
-            className={micButtonClass}
-            title={
-              isSpeechSupported
-                ? isListening
-                  ? "Stop voice input"
-                  : "Start voice input"
-                : "Voice input not supported in this browser"
-            }
-          >
-            {isListening ? (
-              <div className="flex items-center">
-                <div className="mr-2 h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-                <Mic className="w-5 h-5" />
+            <div className="flex items-center gap-4">
+              <div
+                className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.25em] ${
+                  isListening ? "bg-red-500/20 text-red-200" : "bg-emerald-500/15 text-emerald-100"
+                }`}
+              >
+                <span className={`h-2 w-2 rounded-full ${isListening ? "bg-red-400 animate-pulse" : "bg-emerald-300"}`} />
+                {isListening ? "Listening" : "Idle"}
               </div>
-            ) : (
-              <Mic className="w-5 h-5" />
-            )}
-          </Button>
-          <Input
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSendMessage(inputText)}
-            placeholder="Ask Sakhi anything about your farm..."
-            disabled={isProcessing}
-            className={composerInputClass}
-          />
-          <Button
-            type="button"
-            onClick={() => handleSendMessage(inputText)}
-            disabled={isProcessing || !inputText.trim()}
-            size="icon"
-            className={composerButtonClass}
-          >
-            <Send className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-2 border-emerald-300 text-emerald-100"
+                onClick={armVoicePlayback}
+                disabled={voiceEnabled}
+              >
+                <Volume2 className="h-4 w-4" />
+                {voiceEnabled ? "Armed" : "Enable voice reply"}
+              </Button>
+            </div>
+          </div>
+        </header>
 
-      {consentRequest && (
-        <ConsentModal
-          isOpen={!!consentRequest}
-          onClose={() => setConsentRequest(null)}
-          consentRequest={consentRequest}
-          onConsent={handleConsent}
-        />
-      )}
-    </div>
+        <motion.div
+          className="flex-1 space-y-5 overflow-y-auto px-5 pb-6 md:px-6"
+          initial="hidden"
+          animate="visible"
+          variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.05 } } }}
+        >
+          <AnimatePresence initial={false}>
+            {messages.map((message) => {
+              const isUser = message.sender === "user";
+              const avatarClass = isUser ? userAvatarClass : sakhiAvatarClass;
+              const bubbleClass = isUser ? userBubbleClass : sakhiBubbleClass;
+
+              return (
+                <motion.div
+                  key={message.id}
+                  layout
+                  variants={messageVariants}
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
+                  className={`flex gap-3 ${isUser ? "flex-row-reverse" : ""}`}
+                >
+                  <div
+                    className={`mt-0.5 flex h-9 w-9 items-center justify-center rounded-full shadow-lg ring-1 ring-white/10 ${avatarClass}`}
+                  >
+                    {isUser ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
+                  </div>
+                  <div className={`flex max-w-[80%] flex-col gap-2 ${isUser ? "items-end" : ""}`}>
+                    <Card className={`border-0 shadow-lg backdrop-blur-xl transition ${bubbleClass}`}>
+                      <CardContent className="p-4">
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
+                      </CardContent>
+                    </Card>
+                    {message.quickActions && message.quickActions.length > 0 && (
+                      <motion.div
+                        layout
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="self-stretch"
+                      >
+                        <QuickActions actions={message.quickActions} onAction={handleQuickAction} />
+                      </motion.div>
+                    )}
+                    <motion.span
+                      layout
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2, delay: 0.05 }}
+                      className={timestampClass}
+                    >
+                      {message.timestamp.toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </motion.span>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {isProcessing && (
+              <motion.div
+                key="processing"
+                className="flex gap-3"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.25 }}
+              >
+                <div
+                  className={`mt-0.5 flex h-9 w-9 items-center justify-center rounded-full shadow-lg ring-1 ring-white/10 ${sakhiAvatarClass}`}
+                >
+                  <Bot className="w-4 h-4" />
+                </div>
+                <Card className={`border-0 shadow-lg backdrop-blur-xl ${sakhiBubbleClass}`}>
+                  <CardContent className="flex items-center gap-2 p-4">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <p className="text-sm">Sakhi is thinking...</p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div ref={messagesEndRef} />
+        </motion.div>
+
+        <AnimatePresence mode="wait">
+          <motion.div
+            key="composer"
+            className={
+              embedded
+                ? "border-t border-border/40 bg-muted/30 px-5 py-4"
+                : "border-t border-white/10 bg-white/5 px-5 py-4 backdrop-blur-xl"
+            }
+            variants={composerVariants}
+            initial="hidden"
+            animate="visible"
+            exit="hidden"
+          >
+            <div className="flex flex-col gap-4 md:flex-row md:items-center">
+              <div className="flex items-center gap-3">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleMicClick}
+                  disabled={isProcessing || !isSpeechSupported}
+                  className={micButtonClass}
+                  title={
+                    isSpeechSupported
+                      ? isListening
+                        ? "Stop voice input"
+                        : "Start voice input"
+                      : "Voice input not supported in this browser"
+                  }
+                >
+                  {isListening ? (
+                    <div className="flex items-center">
+                      <div className="mr-2 h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                      <Mic className="w-5 h-5" />
+                    </div>
+                  ) : (
+                    <Mic className="w-5 h-5" />
+                  )}
+                </Button>
+              </div>
+              <div className="flex flex-1 items-center gap-3">
+                <Input
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSendMessage(inputText)}
+                  placeholder="Ask Sakhi anything about your farm..."
+                  disabled={isProcessing}
+                  className={composerInputClass}
+                />
+                <Button
+                  type="button"
+                  onClick={() => handleSendMessage(inputText)}
+                  disabled={isProcessing || !inputText.trim()}
+                  size="icon"
+                  className={composerButtonClass}
+                >
+                  <Send className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        </AnimatePresence>
+
+        {consentRequest && (
+          <ConsentModal
+            isOpen={!!consentRequest}
+            onClose={() => setConsentRequest(null)}
+            consentRequest={consentRequest}
+            onConsent={handleConsent}
+          />
+        )}
+      </div>
+    </motion.div>
   );
-};
+}
 
 export default SakhiExperience;

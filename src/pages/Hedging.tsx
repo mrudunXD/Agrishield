@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import {
   Shield,
@@ -22,6 +23,12 @@ import {
 const Hedging = () => {
   const [hedgePercentage, setHedgePercentage] = useState([40]);
   const [lockPrice, setLockPrice] = useState('5150');
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [strategyDialog, setStrategyDialog] = useState<{ open: boolean; title: string; steps: string[] }>({
+    open: false,
+    title: '',
+    steps: [],
+  });
   const configuratorRef = useRef<HTMLDivElement | null>(null);
 
   const expectedYield = 80; // quintals
@@ -88,20 +95,40 @@ const Hedging = () => {
       title: 'Baseline hedge',
       description: 'Lock forward contracts for 40% of the harvest. Maintain agility for upside on the remaining output.',
       metrics: ['₹5,150 strike', '60-day window', '40% coverage'],
+      steps: [
+        'Reserve 40% of projected yield for fixed-price contracts.',
+        'Align dispatch schedule with Sangli mandi receiving slots.',
+        'Set reminder to review basis spread after 30 days.',
+      ],
     },
     {
       title: 'Layered exposure',
       description: 'Split hedges into 30% now & 20% staggered in 3 weeks to ride favourable price spikes.',
       metrics: ['Dual tranches', 'Rebalance alerts', 'Risk 1.2%'],
+      steps: [
+        'Secure 30% coverage immediately at current strike.',
+        'Create follow-up order for 20% coverage with trigger at ₹5,400.',
+        'Activate price alerts every ₹120 change to revisit layers.',
+      ],
     },
     {
       title: 'Premium hedge',
       description: 'Upgrade with insurance add-on for natural calamity cover on unhedged balance.',
       metrics: ['₹120 add-on', 'Weather cover', 'Claim in <7 days'],
+      steps: [
+        'Sign up for weather insurance rider covering remaining output.',
+        'Share warehouse documents to enable expedited claim processing.',
+        'Schedule quarterly review with risk advisor for coverage calibration.',
+      ],
     },
   ];
 
   const handleCreateHedge = () => {
+    setConfirmOpen(true);
+  };
+
+  const handleConfirmHedge = () => {
+    setConfirmOpen(false);
     toast({
       title: "Virtual hedge created",
       description: `${hedgePercentage[0]}% of yield secured at ₹${lockPrice}/quintal`,
@@ -348,13 +375,86 @@ const Hedging = () => {
                   </Badge>
                 ))}
               </div>
-              <Button variant="ghost" size="sm" className="gap-1 text-xs text-primary hover:text-primary">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1 text-xs text-primary hover:text-primary"
+                onClick={() =>
+                  setStrategyDialog({ open: true, title: track.title, steps: track.steps })
+                }
+              >
                 View steps <ArrowRight className="w-3 h-3" />
               </Button>
             </div>
           ))}
         </CardContent>
       </Card>
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <Shield className="w-5 h-5 text-primary" /> Confirm hedge summary
+            </DialogTitle>
+            <DialogDescription>
+              Review the contract snapshot before locking the hedge.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 text-sm">
+            <div className="rounded-2xl border border-border/40 bg-muted/20 p-4">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Coverage</p>
+              <p className="mt-1 text-lg font-semibold text-foreground">{hedgePercentage[0]}% ({hedgedQuantity} Q)</p>
+            </div>
+            <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4">
+              <p className="text-xs uppercase tracking-wide text-primary/80">Lock price</p>
+              <p className="mt-1 text-lg font-semibold text-primary">₹{Number(lockPrice || 0).toLocaleString('en-IN')}/quintal</p>
+            </div>
+            <div className="rounded-2xl border border-success/40 bg-success/10 p-4">
+              <p className="text-xs uppercase tracking-wide text-success/80">Projected revenue</p>
+              <p className="mt-1 text-lg font-semibold text-success">₹{lockedRevenue.toLocaleString('en-IN')}</p>
+            </div>
+            <div className="rounded-2xl border border-border/40 bg-muted/20 p-4 text-xs text-muted-foreground leading-relaxed">
+              This summary has been saved in your analytics feed. Confirm to notify the hedging desk and trigger monitoring alerts.
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmOpen(false)}>Cancel</Button>
+            <Button onClick={handleConfirmHedge} className="gap-2">
+              <CheckCircle className="w-4 h-4" /> Confirm hedge
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={strategyDialog.open} onOpenChange={(open) => setStrategyDialog((prev) => ({ ...prev, open }))}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-lg flex items-center gap-2">
+              <ArrowRight className="w-5 h-5 text-primary" /> {strategyDialog.title}
+            </DialogTitle>
+            <DialogDescription>Breakdown of the recommended play steps.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            {strategyDialog.steps.map((step, index) => (
+              <div key={`${strategyDialog.title}-${index}`} className="rounded-2xl border border-border/40 bg-muted/20 p-4">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Step {index + 1}</p>
+                <p className="mt-1 text-foreground leading-relaxed">{step}</p>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStrategyDialog((prev) => ({ ...prev, open: false }))}>Close</Button>
+            <Button onClick={() => {
+              toast({
+                title: 'Added to playbook',
+                description: `${strategyDialog.title} steps pinned to your strategy deck.`,
+              });
+              setStrategyDialog((prev) => ({ ...prev, open: false }));
+            }}>
+              Save to playbook
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

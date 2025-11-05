@@ -164,31 +164,58 @@ const About: React.FC = () => {
           </div>
         </section>
 
-        {/* Stats Section */}
+        {/* Field Insights Section */}
         <section className="mb-16">
-          <Card className="bg-primary text-white">
-            <CardContent className="p-8 md:p-12">
-              <h2 className="text-3xl font-bold text-center mb-12">Our Impact</h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-                <div className="text-center">
-                  <div className="text-4xl md:text-5xl font-bold mb-2">10,000+</div>
-                  <div className="text-white/80">Farmers Registered</div>
+          <h2 className="text-3xl font-bold text-center mb-12">What Farmers Gain on Day One</h2>
+          <div className="grid gap-6 md:grid-cols-3">
+            <Card className="border border-primary/30 bg-primary/5">
+              <CardContent className="p-6 space-y-4">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary/15 text-primary">
+                  <Shield className="w-6 h-6" />
                 </div>
-                <div className="text-center">
-                  <div className="text-4xl md:text-5xl font-bold mb-2">500+</div>
-                  <div className="text-white/80">FPOs Connected</div>
+                <h3 className="text-xl font-semibold">Risk briefings every Monday</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Weekly WhatsApp digests summarise weather disruptions, mandi volatility, and input price changes for your village cluster.
+                </p>
+                <ul className="space-y-2 text-sm text-foreground/80">
+                  <li>⏱️ 3-minute read in Hindi, Marathi, or Kannada</li>
+                  <li>📊 Action checklist tailored to your acreage</li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            <Card className="border border-success/30 bg-success/5">
+              <CardContent className="p-6 space-y-4">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-success/15 text-success">
+                  <TrendingUp className="w-6 h-6" />
                 </div>
-                <div className="text-center">
-                  <div className="text-4xl md:text-5xl font-bold mb-2">₹50Cr+</div>
-                  <div className="text-white/80">Income Protected</div>
+                <h3 className="text-xl font-semibold">Shared agronomy playbooks</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Download ready-to-deploy spray schedules, fertigation recipes, and pest scouting templates curated with KVK partners.
+                </p>
+                <ul className="space-y-2 text-sm text-foreground/80">
+                  <li>📁 CSV + PDF formats</li>
+                  <li>🤝 Co-created with 18 FPO agronomists</li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            <Card className="border border-warning/30 bg-warning/5">
+              <CardContent className="p-6 space-y-4">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-warning/15 text-warning">
+                  <Users className="w-6 h-6" />
                 </div>
-                <div className="text-center">
-                  <div className="text-4xl md:text-5xl font-bold mb-2">25%</div>
-                  <div className="text-white/80">Avg. Yield Increase</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                <h3 className="text-xl font-semibold">Mentor-on-call desk</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Speak with a crop economist or insurance specialist in under 30 minutes to review hedging plans or financing paperwork.
+                </p>
+                <ul className="space-y-2 text-sm text-foreground/80">
+                  <li>☎️ Hotline: +91-80-4890-2200</li>
+                  <li>🗓️ Slots open 7 AM – 9 PM IST, Monday to Saturday</li>
+                </ul>
+              </CardContent>
+            </Card>
+          </div>
         </section>
 
         {/* CTA Section */}

@@ -7,7 +7,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
-import { FileText, Calendar, PiggyBank, CheckCircle2, Clock3, XCircle, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import {
+  FileText,
+  Calendar,
+  PiggyBank,
+  CheckCircle2,
+  Clock3,
+  XCircle,
+  ArrowUpRight,
+  ArrowDownRight,
+  GaugeCircle,
+  ShieldCheck,
+  TrendingUp,
+} from 'lucide-react';
 
 type ContractRecord = {
   id: string;
@@ -118,11 +130,91 @@ const Contracts: React.FC = () => {
     }
   };
 
+  const parseQuantity = useCallback((value: string) => {
+    const numeric = parseFloat(value.replace(/[^0-9.]/g, ''));
+    return Number.isFinite(numeric) ? numeric : 0;
+  }, []);
+
+  const parsePrice = useCallback((value: string) => {
+    const numeric = parseFloat(value.replace(/[^0-9.]/g, ''));
+    return Number.isFinite(numeric) ? numeric : 0;
+  }, []);
+
+  const analytics = useMemo(() => {
+    if (!contracts.length) {
+      return {
+        totalQuantity: 0,
+        hedgedValue: 0,
+        avgLocked: 0,
+        avgSpot: 0,
+        totalSavings: 0,
+        activeRatio: 0,
+        upcoming: [] as ContractRecord[],
+      };
+    }
+
+    const totals = contracts.reduce(
+      (acc, contract) => {
+        const quantity = parseQuantity(contract.quantity);
+        const locked = parsePrice(contract.lockedPrice);
+        const current = parsePrice(contract.currentPrice);
+        const savings = parseFloat(contract.savings.replace(/[^-0-9.]/g, '')) || 0;
+
+        acc.totalQuantity += quantity;
+        acc.hedgedValue += quantity * locked;
+        acc.totalLocked += locked;
+        acc.totalSpot += current;
+        acc.totalSavings += savings;
+        acc.count += 1;
+        if (contract.status === 'active') acc.active += 1;
+        acc.deliveries.push(contract);
+        return acc;
+      },
+      {
+        totalQuantity: 0,
+        hedgedValue: 0,
+        totalLocked: 0,
+        totalSpot: 0,
+        totalSavings: 0,
+        active: 0,
+        count: 0,
+        deliveries: [] as ContractRecord[],
+      }
+    );
+
+    const upcoming = totals.deliveries
+      .filter((item) => new Date(item.deliveryDate).getTime() >= Date.now())
+      .sort((a, b) => new Date(a.deliveryDate).getTime() - new Date(b.deliveryDate).getTime())
+      .slice(0, 3);
+
+    return {
+      totalQuantity: totals.totalQuantity,
+      hedgedValue: totals.hedgedValue,
+      avgLocked: totals.totalLocked / totals.count,
+      avgSpot: totals.totalSpot / totals.count,
+      totalSavings: totals.totalSavings,
+      activeRatio: totals.count ? totals.active / totals.count : 0,
+      upcoming,
+    };
+  }, [contracts, parsePrice, parseQuantity]);
+
+  const hedgeBreakeven = useMemo(() => {
+    const delta = analytics.avgLocked - analytics.avgSpot;
+    return {
+      delta,
+      message:
+        delta >= 0
+          ? 'Locked prices remain above current spot — coverage is yielding gains.'
+          : 'Spot has overtaken the locked strike. Review tranches to trim carry costs.',
+    };
+  }, [analytics.avgLocked, analytics.avgSpot]);
+
   const handleExportReport = useCallback(() => {
     const payload = {
       generatedAt: new Date().toISOString(),
       summary: summaryHighlights,
       contracts,
+      analytics,
     };
 
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -190,6 +282,93 @@ const Contracts: React.FC = () => {
             New contract
           </Button>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <Card className="border-border/40 bg-card/95 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <GaugeCircle className="w-4 h-4 text-primary" /> Coverage health
+            </CardTitle>
+            <CardDescription>Portfolio averages based on current contracts.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <div className="flex items-center justify-between rounded-xl border border-primary/20 bg-primary/5 p-3">
+              <span className="text-muted-foreground">Hedged volume</span>
+              <strong className="text-primary">{analytics.totalQuantity.toFixed(2)} tons</strong>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="rounded-xl border border-border/40 bg-muted/20 p-3 space-y-1">
+                <p className="uppercase tracking-wide text-muted-foreground">Avg locked</p>
+                <p className="text-sm font-semibold text-foreground">₹{analytics.avgLocked.toFixed(0)}/Q</p>
+              </div>
+              <div className="rounded-xl border border-border/40 bg-muted/20 p-3 space-y-1">
+                <p className="uppercase tracking-wide text-muted-foreground">Avg spot</p>
+                <p className="text-sm font-semibold text-foreground">₹{analytics.avgSpot.toFixed(0)}/Q</p>
+              </div>
+            </div>
+            <div className="rounded-xl border border-success/40 bg-success/10 p-3">
+              <p className="text-xs uppercase tracking-wide text-success/80">Cumulative savings</p>
+              <p className="text-sm font-semibold text-success">₹{analytics.totalSavings.toLocaleString('en-IN')}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/40 bg-card/95 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <ShieldCheck className="w-4 h-4 text-primary" /> Risk monitor
+            </CardTitle>
+            <CardDescription>Active hedges vs exposure by contract count.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <div className="rounded-2xl border border-border/40 bg-muted/20 p-4">
+              <div className="flex items-center justify-between text-xs uppercase tracking-wide text-muted-foreground">
+                <span>Active coverage</span>
+                <span>{Math.round(analytics.activeRatio * 100)}%</span>
+              </div>
+              <div className="mt-3 h-2 rounded-full bg-muted/60 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-primary"
+                  style={{ width: `${Math.min(100, Math.round(analytics.activeRatio * 100))}%` }}
+                />
+              </div>
+            </div>
+            <div className={`rounded-2xl border ${hedgeBreakeven.delta >= 0 ? 'border-success/40 bg-success/10' : 'border-destructive/40 bg-destructive/10'} p-4 text-xs leading-relaxed`}>
+              <p className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <TrendingUp className="w-4 h-4 text-primary" /> Breakeven watch
+              </p>
+              <p className="mt-2 text-muted-foreground">{hedgeBreakeven.message}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/40 bg-card/95 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Calendar className="w-4 h-4 text-primary" /> Upcoming deliveries
+            </CardTitle>
+            <CardDescription>Stay ahead of logistics for the next 3 fulfilments.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            {analytics.upcoming.length === 0 ? (
+              <p className="text-muted-foreground text-xs">No scheduled deliveries. Plan your next tranche from the hedging hub.</p>
+            ) : (
+              analytics.upcoming.map((item) => (
+                <div key={item.id} className="rounded-2xl border border-border/40 bg-muted/20 p-3 space-y-1">
+                  <div className="flex items-center justify-between text-xs uppercase tracking-wide text-muted-foreground">
+                    <span>{item.crop}</span>
+                    <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary text-[10px]">
+                      {new Date(item.deliveryDate).toLocaleDateString()}
+                    </Badge>
+                  </div>
+                  <p className="text-sm font-semibold text-foreground">{item.quantity}</p>
+                  <p className="text-xs text-muted-foreground">Buyer · {item.buyer}</p>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">

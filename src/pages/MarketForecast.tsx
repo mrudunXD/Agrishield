@@ -32,19 +32,23 @@ const MarketForecast = () => {
   const [alertNote, setAlertNote] = useState('Track Sangli mandi premium window.');
 
   const priceData = [
-    { month: 'Jan', price: 4800 },
-    { month: 'Feb', price: 4950 },
-    { month: 'Mar', price: 5100 },
-    { month: 'Apr', price: 5200 },
-    { month: 'May', price: 5350 },
-    { month: 'Jun', price: 5180 },
+    { month: 'Jan', price: 4720 },
+    { month: 'Feb', price: 4860 },
+    { month: 'Mar', price: 5035 },
+    { month: 'Apr', price: 5310 },
+    { month: 'May', price: 5480 },
+    { month: 'Jun', price: 5210 },
   ];
 
-  const maxPrice = Math.max(...priceData.map((data) => data.price)) + 150;
-  const axisTicks = Array.from({ length: 4 }, (_, index) => Math.max(0, maxPrice - index * 200));
+  const maxPrice = Math.max(...priceData.map((data) => data.price)) + 200;
+  const minPrice = Math.min(...priceData.map((data) => data.price)) - 150;
+  const axisTicks = Array.from({ length: 5 }, (_, index) => {
+    const step = (maxPrice - minPrice) / 4;
+    return Math.round(minPrice + step * index);
+  }).reverse();
   const chartPoints = priceData.map((data, idx) => {
     const x = (idx / (priceData.length - 1)) * 100;
-    const y = 100 - (data.price / maxPrice) * 100;
+    const y = 100 - ((data.price - minPrice) / (maxPrice - minPrice)) * 100;
     return { ...data, x, y };
   });
   const areaPath = [

@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ProfileDocument, SupportRequest, defaultProfileDocument } from "@shared/profile";
@@ -72,6 +73,7 @@ const Profile: React.FC = () => {
   const [farmForm, setFarmForm] = useState(() => createFarmForm());
 
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const {
     data: profileData,
@@ -103,6 +105,23 @@ const Profile: React.FC = () => {
       });
     }
   }, [profileData, isEditing, bankDialogOpen]);
+
+  useEffect(() => {
+    if (!user || isEditing) return;
+
+    setProfile((prev) => {
+      const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
+      const nextName = fullName || prev.name;
+      if (prev.name === nextName && prev.email === user.email) {
+        return prev;
+      }
+      return {
+        ...prev,
+        name: nextName,
+        email: user.email,
+      };
+    });
+  }, [user, isEditing]);
 
   const assembleProfilePayload = useCallback(
     (overrides?: Partial<ProfileDocument>): ProfileDocument => ({
@@ -425,6 +444,11 @@ const Profile: React.FC = () => {
     [farms]
   );
   const location = useMemo(() => `${profile.village}, ${profile.state}`, [profile.village, profile.state]);
+  const displayName = useMemo(() => {
+    const derived = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim();
+    return derived || profile.name || user?.email || 'Farmer';
+  }, [user?.firstName, user?.lastName, user?.email, profile.name]);
+  const displayEmail = user?.email || profile.email;
   const contactDetails = useMemo(
     () => [
       { label: 'Phone', value: profile.phone, icon: Phone },
@@ -485,12 +509,19 @@ const Profile: React.FC = () => {
             <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
               <div className="space-y-5">
                 <div className="flex items-center gap-4">
-                  <Avatar className="h-24 w-24 border-4 border-white shadow-lg ring-2 ring-primary/20">
-                    <AvatarImage src="https://api.dicebear.com/7.x/avataaars/svg?seed=Rajesh" />
-                    <AvatarFallback>RK</AvatarFallback>
+                  <Avatar className="h-24 w-24 border-4 border-white shadow-lg ring-2 ring-primary/20 bg-primary text-primary-foreground">
+                    <AvatarFallback className="text-3xl font-semibold">
+                      {displayName
+                        .split(' ')
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .map((part) => part[0]?.toUpperCase())
+                        .join('') || 'AG'}
+                    </AvatarFallback>
                   </Avatar>
                   <div className="space-y-2">
-                    <h2 className="text-2xl font-semibold text-foreground">{profile.name}</h2>
+                    <h2 className="text-2xl font-semibold text-foreground">{displayName}</h2>
+                    <p className="text-sm text-muted-foreground">{displayEmail}</p>
                     <p className="text-sm text-foreground/80">{profile.fpoCode}</p>
                     <div className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-xs font-medium text-primary shadow-sm">
                       <MapPin className="h-3.5 w-3.5" />

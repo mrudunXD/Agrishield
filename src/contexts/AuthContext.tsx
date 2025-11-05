@@ -18,6 +18,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
   signup: (email: string, password: string, firstName: string, lastName: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => void;
+  updatePreferredLanguage: (language: string) => void;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -98,6 +99,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return { success: true };
   };
 
+  const updatePreferredLanguage = (language: string) => {
+    setUser((prevUser) => {
+      if (!prevUser) return prevUser;
+
+      const updatedUser = { ...prevUser, preferredLanguage: language };
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(updatedUser));
+
+      const users = getAllUsers();
+      const userIndex = users.findIndex((u) => u.id === prevUser.id);
+      if (userIndex !== -1) {
+        users[userIndex] = { ...users[userIndex], preferredLanguage: language };
+        saveUsers(users);
+      }
+
+      return updatedUser;
+    });
+  };
+
   const signup = async (
     email: string,
     password: string,
@@ -156,6 +175,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     login,
     signup,
     logout,
+    updatePreferredLanguage,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

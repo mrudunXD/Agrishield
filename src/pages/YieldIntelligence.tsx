@@ -26,6 +26,7 @@ const YieldIntelligence = () => {
   const [fertilizerLevel, setFertilizerLevel] = useState([75]);
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [sowingCalendarOpen, setSowingCalendarOpen] = useState(false);
+  const [fieldChecklistOpen, setFieldChecklistOpen] = useState(false);
   const [selectedPlotId, setSelectedPlotId] = useState<string | null>(null);
 
   const plots = [
@@ -148,6 +149,32 @@ const YieldIntelligence = () => {
   const recommendedIrrigation = 80;
   const recommendedFertilizer = 90;
 
+  const fieldChecklist = useMemo(
+    () => [
+      {
+        title: 'Moisture balance',
+        detail: 'Irrigate Plot D within the next 18 hours and re-check sensors 2 hours post watering.',
+        tag: 'Urgent',
+      },
+      {
+        title: 'Nutrient plan',
+        detail: 'Broadcast 20 kg/acre DAP on Plots B & D, followed by foliar spray on day 3.',
+        tag: 'Recommended',
+      },
+      {
+        title: 'Scouting route',
+        detail: 'Walk east boundary at 5 PM tomorrow to look for aphid clusters and leaf curling.',
+        tag: 'Field walk',
+      },
+      {
+        title: 'Equipment readiness',
+        detail: 'Calibrate drip emitters on south block and clean pivot filters before the weekend rainfall.',
+        tag: 'Maintenance',
+      },
+    ],
+    []
+  );
+
   const sowingCalendar = [
     {
       phase: 'Seed selection',
@@ -246,8 +273,8 @@ const YieldIntelligence = () => {
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Button size="lg" className="gap-2">
-                <MapPin className="w-5 h-5" /> View satellite map
+              <Button size="lg" className="gap-2" onClick={() => setFieldChecklistOpen(true)}>
+                <Sparkles className="w-5 h-5" /> Generate field readiness plan
               </Button>
               <Button variant="outline" size="lg" className="gap-2" onClick={handleDownloadInsights}>
                 <TrendingUp className="w-5 h-5" /> Download insights
@@ -753,6 +780,43 @@ const YieldIntelligence = () => {
               </DialogFooter>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={fieldChecklistOpen} onOpenChange={setFieldChecklistOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <Sparkles className="w-5 h-5 text-primary" /> 48-hour readiness checklist
+            </DialogTitle>
+            <DialogDescription>
+              Prioritised actions compiled from soil, weather and crop health signals.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {fieldChecklist.map((item) => (
+              <div key={item.title} className="rounded-2xl border border-border/40 bg-muted/25 p-4 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-foreground">{item.title}</p>
+                  <Badge variant="outline" className="border-primary/40 bg-primary/10 text-primary text-[11px]">
+                    {item.tag}
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground leading-relaxed">{item.detail}</p>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFieldChecklistOpen(false)}>
+              Close
+            </Button>
+            <Button onClick={() => {
+              handleDownloadInsights();
+              setFieldChecklistOpen(false);
+            }}>
+              Export with insights
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

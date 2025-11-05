@@ -1,9 +1,7 @@
 import { useEffect } from "react";
 import { Languages } from "lucide-react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/useAuth";
-import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,10 +33,9 @@ const languages: Language[] = [
 ];
 
 const LanguageSelector = () => {
-  const { user } = useAuth();
+  const { user, updatePreferredLanguage } = useAuth();
   const { toast } = useToast();
   const { t, i18n } = useTranslation();
-  const queryClient = useQueryClient();
   
   const selectedLanguage = user?.preferredLanguage || i18n.language || "en";
   const currentLanguage = languages.find((l) => l.code === selectedLanguage);
@@ -49,33 +46,22 @@ const LanguageSelector = () => {
     }
   }, [user?.preferredLanguage, i18n]);
 
-  const mutation = useMutation({
-    mutationFn: async (language: string) => {
-      return apiRequest("/api/user/language", {
-        method: "POST",
-        body: JSON.stringify({ language }),
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+  const handleLanguageChange = (code: string) => {
+    try {
+      i18n.changeLanguage(code);
+      updatePreferredLanguage(code);
       toast({
         title: t('language.languageUpdated'),
         description: t('language.languageSaved'),
       });
-    },
-    onError: (error) => {
+    } catch (error) {
+      console.error('Error updating preferred language:', error);
       toast({
         title: t('language.error'),
         description: t('language.errorUpdating'),
-        variant: "destructive",
+        variant: 'destructive',
       });
-      console.error("Error updating language:", error);
-    },
-  });
-
-  const handleLanguageChange = (code: string) => {
-    i18n.changeLanguage(code);
-    mutation.mutate(code);
+    }
   };
 
   return (

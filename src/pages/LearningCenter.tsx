@@ -6,6 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
+import LessonPlayer from "@/components/learning/LessonPlayer";
 import {
   Award,
   CalendarDays,
@@ -15,8 +16,21 @@ import {
   PlayCircle,
   Sparkles,
   Users,
-  BookOpen
+  BookOpen,
+  Sprout,
+  LineChart,
+  ShieldCheck,
+  Droplets,
+  Microscope,
+  Wheat,
+  Play,
+  Pause,
+  Video,
+  Trophy,
+  Star,
+  Diamond,
 } from 'lucide-react';
+import { motion } from "framer-motion";
 
 type LessonStatus = 'completed' | 'in-progress' | 'locked';
 
@@ -28,6 +42,8 @@ type Lesson = {
   status: LessonStatus;
   summary: string;
   competency: string;
+  videoUrl?: string;
+  coverImage?: string;
 };
 
 type Module = {
@@ -38,7 +54,12 @@ type Module = {
   progress: number;
   completed: boolean;
   language: string[];
-  icon: string;
+  icon: React.ReactNode;
+  theme: {
+    gradient: string;
+    accent: string;
+    badge: string;
+  };
   quiz: { total: number; passed: number };
   lessons: Lesson[];
 };
@@ -67,7 +88,8 @@ const initialModules: Module[] = [
         duration: "04:30",
         status: "completed",
         summary: "How satellite indices combine with ground truth plots to estimate yield.",
-        competency: "Satellite interpretation"
+        competency: "Satellite interpretation",
+        videoUrl: "https://www.youtube.com/embed/6W8B3p3sBws"
       },
       {
         id: "1-2",
@@ -85,7 +107,8 @@ const initialModules: Module[] = [
         duration: "03:20",
         status: "completed",
         summary: "Sync soil test reports and calibrate yield variance bands.",
-        competency: "Soil analytics"
+        competency: "Soil analytics",
+        videoUrl: "https://www.youtube.com/embed/ka7UQZG1Neo"
       },
       {
         id: "1-4",
@@ -98,7 +121,12 @@ const initialModules: Module[] = [
       }
     ],
     language: ["English", "Hindi", "Marathi"],
-    icon: "🌱",
+    icon: <Sprout className="h-7 w-7" />,
+    theme: {
+      gradient: "from-emerald-500/25 via-lime-400/10 to-transparent",
+      accent: "text-emerald-200",
+      badge: "border-emerald-300/30 bg-emerald-500/15 text-emerald-50"
+    },
     quiz: { total: 5, passed: 5 }
   },
   {
@@ -116,7 +144,8 @@ const initialModules: Module[] = [
         duration: "05:10",
         status: "completed",
         summary: "Compare mandis with forward contracts using recent arrivals data.",
-        competency: "Market literacy"
+        competency: "Market literacy",
+        videoUrl: "https://www.youtube.com/embed/ZF4Kz2jX1x8"
       },
       {
         id: "2-2",
@@ -156,7 +185,12 @@ const initialModules: Module[] = [
       }
     ],
     language: ["English", "Hindi"],
-    icon: "💰",
+    icon: <LineChart className="h-7 w-7" />,
+    theme: {
+      gradient: "from-amber-500/25 via-orange-400/15 to-transparent",
+      accent: "text-amber-200",
+      badge: "border-amber-300/40 bg-amber-500/15 text-amber-100"
+    },
     quiz: { total: 5, passed: 3 }
   },
   {
@@ -174,7 +208,8 @@ const initialModules: Module[] = [
         duration: "04:20",
         status: "in-progress",
         summary: "Navigate probability bands and seasonal trend markers.",
-        competency: "Dashboard navigation"
+        competency: "Dashboard navigation",
+        videoUrl: "https://www.youtube.com/embed/L6sJbJbxXbE"
       },
       {
         id: "3-2",
@@ -205,7 +240,12 @@ const initialModules: Module[] = [
       }
     ],
     language: ["English", "Hindi", "Gujarati"],
-    icon: "📈",
+    icon: <ShieldCheck className="h-7 w-7" />,
+    theme: {
+      gradient: "from-sky-500/25 via-indigo-400/20 to-transparent",
+      accent: "text-sky-200",
+      badge: "border-sky-300/40 bg-sky-500/15 text-sky-100"
+    },
     quiz: { total: 5, passed: 0 }
   },
   {
@@ -223,7 +263,8 @@ const initialModules: Module[] = [
         duration: "05:00",
         status: "in-progress",
         summary: "Create a virtual contract using Sakhi's hedging hub.",
-        competency: "Platform mastery"
+        competency: "Platform mastery",
+        videoUrl: "https://www.youtube.com/embed/pihcAg9-31A"
       },
       {
         id: "4-2",
@@ -263,7 +304,12 @@ const initialModules: Module[] = [
       }
     ],
     language: ["English", "Hindi"],
-    icon: "📝",
+    icon: <Microscope className="h-7 w-7" />,
+    theme: {
+      gradient: "from-fuchsia-500/25 via-purple-500/15 to-transparent",
+      accent: "text-fuchsia-200",
+      badge: "border-fuchsia-400/40 bg-fuchsia-500/15 text-fuchsia-100"
+    },
     quiz: { total: 5, passed: 0 }
   },
   {
@@ -281,7 +327,8 @@ const initialModules: Module[] = [
         duration: "04:20",
         status: "completed",
         summary: "Decode pH, EC and organic carbon insights for your plot.",
-        competency: "Soil literacy"
+        competency: "Soil literacy",
+        videoUrl: "https://www.youtube.com/embed/EWcY8wP9zPc"
       },
       {
         id: "5-2",
@@ -321,16 +368,45 @@ const initialModules: Module[] = [
       }
     ],
     language: ["English", "Hindi", "Telugu"],
-    icon: "🌾",
+    icon: <Droplets className="h-7 w-7" />,
+    theme: {
+      gradient: "from-green-500/25 via-teal-400/20 to-transparent",
+      accent: "text-teal-200",
+      badge: "border-teal-300/40 bg-teal-500/15 text-teal-100"
+    },
     quiz: { total: 5, passed: 1 }
   }
 ];
 
 const achievements = [
-  { title: "First Module Complete", icon: "🎓", unlocked: true },
-  { title: "Quiz Master", icon: "🏆", unlocked: true },
-  { title: "5 Modules Done", icon: "⭐", unlocked: false },
-  { title: "Hedging Expert", icon: "💎", unlocked: false }
+  {
+    title: "First Module Complete",
+    description: "You unlocked your Sakhi learning streak and earned your starter badge.",
+    icon: <Award className="h-6 w-6" />,
+    unlocked: true,
+    accent: "from-emerald-500/25 via-emerald-500/10 to-transparent",
+  },
+  {
+    title: "Quiz Master",
+    description: "Score 80%+ consistently across knowledge checks to keep this trophy shining.",
+    icon: <Trophy className="h-6 w-6" />,
+    unlocked: true,
+    accent: "from-amber-500/25 via-orange-500/10 to-transparent",
+  },
+  {
+    title: "5 Modules Done",
+    description: "Complete five core journeys to unlock advanced agronomy mentorship.",
+    icon: <Star className="h-6 w-6" />,
+    unlocked: false,
+    accent: "from-sky-500/25 via-indigo-500/10 to-transparent",
+  },
+  {
+    title: "Hedging Expert",
+    description: "Master risk strategies and publish your own hedge playbook to earn this gem.",
+    icon: <Diamond className="h-6 w-6" />,
+    unlocked: false,
+    accent: "from-fuchsia-500/25 via-purple-500/10 to-transparent",
+  },
 ];
 
 const playlists = [
@@ -426,9 +502,24 @@ const certificatePath: CertificateMilestone[] = [
   }
 ];
 
+const LESSON_STATUS_LABEL: Record<LessonStatus, string> = {
+  completed: "Completed",
+  "in-progress": "In progress",
+  locked: "Locked",
+};
+
+const LESSON_TYPE_LABEL: Record<Lesson["type"], string> = {
+  video: "Video lesson",
+  case: "Case study",
+  quiz: "Knowledge quiz",
+  lab: "Practice lab",
+  note: "Field note",
+};
+
 const LearningCenter: React.FC = () => {
   const [selectedModule, setSelectedModule] = useState<string | null>(null);
   const [certificateOpen, setCertificateOpen] = useState(false);
+  const [focusedLesson, setFocusedLesson] = useState<Lesson | null>(null);
 
   const modules = useMemo(() => initialModules, []);
 
@@ -467,8 +558,10 @@ const LearningCenter: React.FC = () => {
 
   const handleResumeLearning = () => {
     if (resumeModule) {
+      const lesson =
+        resumeModule.lessons.find((item) => item.status === 'in-progress') ?? resumeModule.lessons[0] ?? null;
       setSelectedModule(resumeModule.id.toString());
-      const lesson = resumeModule.lessons.find((item) => item.status === 'in-progress') ?? resumeModule.lessons[0];
+      setFocusedLesson(lesson);
       toast({
         title: `Resuming ${resumeModule.title}`,
         description: lesson ? `Next up: ${lesson.title}` : 'Pick any lesson to continue your journey.',
@@ -489,6 +582,9 @@ const LearningCenter: React.FC = () => {
     const moduleToOpen = modules.find((module) => module.id === moduleId);
     if (!moduleToOpen) return;
     setSelectedModule(moduleId.toString());
+    const nextUp =
+      moduleToOpen.lessons.find((lesson) => lesson.status !== 'locked') ?? moduleToOpen.lessons[0] ?? null;
+    setFocusedLesson(nextUp ?? null);
     toast({
       title: moduleToOpen.completed ? 'Revisiting module' : 'Continuing module',
       description: moduleToOpen.description,
@@ -503,6 +599,8 @@ const LearningCenter: React.FC = () => {
       });
       return;
     }
+
+    setFocusedLesson(lesson);
 
     toast({
       title: `Launching ${lesson.title}`,
@@ -639,96 +737,127 @@ const LearningCenter: React.FC = () => {
           <TabsTrigger value="achievements">Achievements</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="modules" className="space-y-4">
-          {modules.map((module) => (
-            <Card key={module.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-4 flex-1">
-                    <div className="text-4xl">{module.icon}</div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <CardTitle className="text-xl">{module.title}</CardTitle>
-                        {module.completed && (
-                          <Badge className="bg-success text-white">
-                            <CheckCircle className="w-3 h-3 mr-1" />
-                            Completed
-                          </Badge>
+        <TabsContent value="modules">
+          <div className="space-y-4">
+            {modules.map((module, index) => (
+              <motion.div
+                key={module.id}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+              >
+                <Card className="relative overflow-hidden border border-border/40 bg-card/80 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+                  <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${module.theme.gradient}`} aria-hidden />
+                  <CardHeader className="relative z-10">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-4 flex-1">
+                        <div
+                          className={`flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/10 shadow-inner ${module.theme.accent}`}
+                        >
+                          {module.icon}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <CardTitle className="text-xl text-foreground">{module.title}</CardTitle>
+                            {module.completed && (
+                              <Badge className="bg-success/90 text-white">
+                                <CheckCircle className="w-3 h-3 mr-1" />
+                                Completed
+                              </Badge>
+                            )}
+                          </div>
+                          <CardDescription className="text-sm text-foreground/80">{module.description}</CardDescription>
+                          <div className="flex flex-wrap gap-2 mt-3 text-xs">
+                            <Badge variant="outline" className="border-white/20 bg-white/10 text-foreground/80">
+                              {module.lessons.length} lessons
+                            </Badge>
+                            <Badge variant="outline" className="border-white/20 bg-white/10 text-foreground/80">
+                              {module.duration}
+                            </Badge>
+                            {module.language.map((lang) => (
+                              <Badge key={lang} variant="secondary" className={`text-xs ${module.theme.badge}`}>
+                                {lang}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        className={`min-w-[112px] border-0 shadow-md transition ${
+                          module.completed
+                            ? 'bg-success text-success-foreground hover:bg-success/90'
+                            : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                        }`}
+                        onClick={() => handleContinueModule(module.id)}
+                      >
+                        {module.progress > 0 && !module.completed ? 'Continue' : module.completed ? 'Revisit' : 'Start'}
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  {module.progress > 0 && (
+                    <CardContent className="relative z-10">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between text-sm text-foreground/80">
+                          <span>Progress</span>
+                          <span className="font-semibold text-foreground">{module.progress}%</span>
+                        </div>
+                        <Progress value={module.progress} className="h-2 bg-black/10" />
+                        {module.quiz.total > 0 && (
+                          <div className="flex items-center justify-between text-sm text-foreground/80 pt-1">
+                            <span>Quiz score</span>
+                            <span className="font-medium text-foreground">
+                              {module.quiz.passed}/{module.quiz.total} correct
+                            </span>
+                          </div>
                         )}
                       </div>
-                      <CardDescription>{module.description}</CardDescription>
-                      <div className="flex flex-wrap gap-2 mt-3">
-                        <Badge variant="outline" className="text-xs">
-                          {module.lessons.length} lessons
-                        </Badge>
-                        <Badge variant="outline" className="text-xs">
-                          {module.duration}
-                        </Badge>
-                        {module.language.map((lang) => (
-                          <Badge key={lang} variant="secondary" className="text-xs">
-                            {lang}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  <Button 
-                    className={module.completed ? "bg-success" : "bg-primary"}
-                    onClick={() => handleContinueModule(module.id)}
-                  >
-                    {module.progress > 0 && !module.completed ? (
-                      <>Continue</>
-                    ) : module.completed ? (
-                      <>Revisit</>
-                    ) : (
-                      <>Start</>
-                    )}
-                  </Button>
-                </div>
-              </CardHeader>
-              {module.progress > 0 && (
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Progress</span>
-                      <span className="font-medium">{module.progress}%</span>
-                    </div>
-                    <Progress value={module.progress} />
-                    {module.quiz.total > 0 && (
-                      <div className="flex items-center justify-between text-sm pt-2">
-                        <span className="text-muted-foreground">Quiz Score</span>
-                        <span className="font-medium">
-                          {module.quiz.passed}/{module.quiz.total} correct
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              )}
-            </Card>
-          ))}
+                    </CardContent>
+                  )}
+                </Card>
+              </motion.div>
+            ))}
+          </div>
         </TabsContent>
 
-        <TabsContent value="achievements" className="space-y-4">
+        <TabsContent value="achievements">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {achievements.map((achievement, index) => (
-              <Card key={index} className={achievement.unlocked ? "" : "opacity-50"}>
-                <CardContent className="pt-6 text-center">
-                  <div className="text-6xl mb-4">{achievement.icon}</div>
-                  <h3 className="font-semibold mb-2">{achievement.title}</h3>
-                  {achievement.unlocked ? (
-                    <Badge className="bg-success text-white">
-                      <Award className="w-3 h-3 mr-1" />
-                      Unlocked
+              <motion.div
+                key={achievement.title}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05, duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+              >
+                <Card
+                  className={`relative overflow-hidden border ${
+                    achievement.unlocked ? 'border-primary/30' : 'border-border/40 opacity-70'
+                  }`}
+                >
+                  <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${achievement.accent}`} />
+                  <CardContent className="relative z-10 pt-6 pb-6 text-center space-y-3">
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white/15 text-primary shadow-inner">
+                      {achievement.icon}
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="font-semibold text-foreground">{achievement.title}</h3>
+                      <p className="text-xs text-foreground/80 leading-relaxed px-3">{achievement.description}</p>
+                    </div>
+                    <Badge
+                      className={
+                        achievement.unlocked
+                          ? 'mx-auto bg-success/90 text-white'
+                          : 'mx-auto border-white/30 bg-white/10 text-foreground/80'
+                      }
+                    >
+                      {achievement.unlocked ? (
+                        <span className="flex items-center gap-2"><CheckCircle className="h-3 w-3" /> Unlocked</span>
+                      ) : (
+                        <span className="flex items-center gap-2"><Lock className="h-3 w-3" /> Locked</span>
+                      )}
                     </Badge>
-                  ) : (
-                    <Badge variant="secondary">
-                      <Lock className="w-3 h-3 mr-1" />
-                      Locked
-                    </Badge>
-                  )}
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </motion.div>
             ))}
           </div>
         </TabsContent>
@@ -817,8 +946,16 @@ const LearningCenter: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Dialog open={!!activeModule} onOpenChange={(open) => !open && setSelectedModule(null)}>
-        <DialogContent className="max-w-3xl">
+      <Dialog
+        open={!!activeModule}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedModule(null);
+            setFocusedLesson(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-4xl">
           {activeModule && (
             <>
               <DialogHeader className="space-y-2">
@@ -833,7 +970,29 @@ const LearningCenter: React.FC = () => {
                   <Badge variant="outline" className="text-xs">{activeModule.language.join(' • ')}</Badge>
                 </DialogDescription>
               </DialogHeader>
-              <div className="space-y-4">
+              <div className="space-y-5">
+                {focusedLesson && (
+                  <motion.div
+                    key={focusedLesson.id}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                    className="rounded-2xl border border-border/50 bg-card/90 backdrop-blur p-5 flex flex-col gap-5"
+                  >
+                    <LessonPlayer
+                      title={focusedLesson.title}
+                      summary={focusedLesson.summary}
+                      competency={focusedLesson.competency}
+                      duration={focusedLesson.duration}
+                      source={
+                        focusedLesson.type === 'video' && focusedLesson.videoUrl
+                          ? { type: focusedLesson.videoUrl.includes('youtube.com') ? 'youtube' : 'mp4', url: focusedLesson.videoUrl }
+                          : undefined
+                      }
+                      onComplete={() => toast({ title: 'Lesson completed', description: `${focusedLesson.title} marked as done.` })}
+                    />
+                  </motion.div>
+                )}
                 {nextLesson && (
                   <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                     <div className="space-y-1">
@@ -847,12 +1006,17 @@ const LearningCenter: React.FC = () => {
                   </div>
                 )}
                 <div className="space-y-3">
-                  {activeModule.lessons.map((lesson) => (
+                  {activeModule.lessons.map((lesson) => {
+                    const isActiveLesson = focusedLesson?.id === lesson.id;
+                    const isLocked = lesson.status === 'locked';
+                    return (
                     <div
                       key={lesson.id}
-                      className={`rounded-2xl border p-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between ${
-                        lesson.status === 'locked'
+                      className={`rounded-2xl border p-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between transition ${
+                        isLocked
                           ? 'border-border/40 bg-muted/20 opacity-70'
+                          : isActiveLesson
+                          ? 'border-primary/60 bg-primary/10 shadow-lg'
                           : lesson.status === 'completed'
                           ? 'border-success/40 bg-success/10'
                           : 'border-primary/30 bg-card/90'
@@ -871,18 +1035,21 @@ const LearningCenter: React.FC = () => {
                       </div>
                       <Button
                         size="sm"
-                        variant={lesson.status === 'completed' ? 'secondary' : 'outline'}
-                        className="mt-2 md:mt-0"
+                        variant={lesson.status === 'completed' ? 'secondary' : isActiveLesson ? 'default' : 'outline'}
+                        className={`mt-2 md:mt-0 ${isActiveLesson ? 'bg-primary text-primary-foreground hover:bg-primary/90' : ''}`}
                         onClick={() => handleLaunchLesson(lesson, activeModule)}
                       >
-                        {lesson.status === 'completed'
+                        {isActiveLesson
+                          ? 'Now playing'
+                          : lesson.status === 'completed'
                           ? 'Review'
                           : lesson.status === 'in-progress'
                           ? 'Continue'
                           : 'Unlock lesson'}
                       </Button>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
               <DialogFooter>
